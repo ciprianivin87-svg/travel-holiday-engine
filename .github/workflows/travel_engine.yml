@@ -30,8 +30,8 @@ jobs:
           TRAVELPAYOUTS_API_TOKEN: ${{ secrets.TRAVELPAYOUTS_API_TOKEN }}
           TRAVELPAYOUTS_MARKER: ${{ secrets.TRAVELPAYOUTS_MARKER }}
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          SENDER_EMAIL: "ciprianivin87@gmail.com"
-          SENDER_NAME: "Travel Deal Engine"
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SENDER_NAME: ${{ secrets.SENDER_NAME }}
         run: |
           python main.py
 
