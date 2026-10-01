@@ -6,7 +6,7 @@ load_dotenv()
 from src.calendar_engine import get_upcoming_holiday_bridges
 from src.flight_fetcher import get_cheapest_flight
 from src.ai_enricher import generate_destination_summary
-from src.publisher import build_markdown_report, build_html_newsletter
+from src.publisher import build_markdown_report, build_html_newsletter, send_email_campaign
 
 def run_full_pipeline():
     print("=" * 60)
@@ -27,7 +27,7 @@ def run_full_pipeline():
     destination = "BUD" # Budapest
 
     # 2. Ricerca volo reale tramite Travelpayouts API
-    print(f"✈️ Ricerca voli in corso tramite Travelpayouts API ({origin} ➔ {destination})...")
+    print(f"✈️️ Ricerca voli in corso tramite Travelpayouts API ({origin} ➔ {destination})...")
     flight = get_cheapest_flight(
         origin=origin,
         destination=destination,
@@ -78,10 +78,16 @@ def run_full_pipeline():
     with open("output/newsletter.html", "w", encoding="utf-8") as f:
         f.write(html_content)
 
-    print("\n✅ ESECUZIONE COMPLETATA CON SUCCESSO!")
     print("📁 Generati i file:")
     print("   • output/newsletter.md")
     print("   • output/newsletter.html")
+
+    # 5. Invio Newsletter via Brevo API
+    print("📧 Invio della newsletter tramite Brevo...")
+    subject = f"✈️ Offerta Ponte: {bridge['holiday_name']} a {flight['city_to']} da soli {flight['price']}€!"
+    send_email_campaign(html_content, subject)
+
+    print("\n✅ ESECUZIONE COMPLETATA CON SUCCESSO!")
     print("=" * 60)
 
 if __name__ == "__main__":
