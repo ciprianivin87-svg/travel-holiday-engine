@@ -1,68 +1,65 @@
 import os
 import requests
-from datetime import datetime
 
-TEQUILA_SEARCH_URL = "https://api.tequila.kiwi.com/v2/search"
-
-def search_low_cost_flights(departure_date, return_date, fly_from="IT", max_price=100, limit=5):
+def get_cheapest_flight(origin="BRI", destination="BUD", depart_date=None, return_date=None):
     """
-    Interroga l'API Voli usando le credenziali Travelpayouts / Kiwi.
+    Cerca il volo più economico tramite la Travelpayouts / Aviasales Data API.
     """
-    api_key = os.getenv("TRAVELPAYOUTS_API_TOKEN") or os.getenv("KIWI_API_KEY")
+    token = os.getenv("TRAVELPAYOUTS_API_TOKEN")
     marker = os.getenv("TRAVELPAYOUTS_MARKER", "784148")
     
-    if not api_key:
-        print("⚠️  [flight_fetcher] Variabile 'TRAVELPAYOUTS_API_TOKEN' non trovata.")
-        return []
+    if not token:
+        print("⚠️ TRAVELPAYOUTS_API_TOKEN non trovato nelle variabili d'ambiente.")
+        return None
 
-    # Formattazione date per l'API (DD/MM/YYYY)
-    date_from = datetime.strptime(departure_date, "%Y-%m-%d").strftime("%d/%m/%Y")
-    date_to = datetime.strptime(return_date, "%Y-%m-%d").strftime("%d/%m/%Y")
-
+    url = "https://api.travelpayouts.com/v1/prices/cheap"
+    
     headers = {
-        "apikey": api_key,
-        "accept": "application/json"
+        "x-access-token": token
+    }
+    
+    params = {
+        "origin": origin,
+        "destination": destination,
+        "currency": "EUR"
     }
 
-    params = {
-        "fly_from": fly_from,
-        "date_from": date_from,
-        "date_to": date_from,
-        "return_from": date_to,
-        "return_to": date_to,
-        "flight_type": "round",
-        "curr": "EUR",
-        "price_to": max_price,
-        "max_stopovers": 0,
-        "sort": "price",
-        "limit": limit
-    }
+    # Se le date sono fornite nel formato YYYY-MM-DD, estraiamo l'anno-mese per l'endpoint
+    if depart_date:
+        params["depart_date"] = depart_date[:7]
+    if return_date:
+        params["return_date"] = return_date[:7]
 
     try:
-        response = requests.get(TEQUILA_SEARCH_URL, headers=headers, params=params)
-        response.raise_for_status()
+        response = requests.get(url, headers=headers, params=params, timeout=10)
         data = response.json()
 
-        flights = []
-        for item in data.get("data", []):
-            raw_link = item.get("deep_link", "")
-            # Iniezione automatica del Marker ID di Travelpayouts nell'URL se non già presente
-            affiliate_link = f"{raw_link}&marker={marker}" if raw_link and "marker=" not in raw_link else raw_link
+        if data.get("success") and destination in data.get("data", {}):
+            destination_deals = data["data"][destination]
+            
+            # Selezioniamo la prima offerta disponibile
+            offer_key = list(destination_deals.keys())[0]
+            deal = destination_deals[offer_key]
+            
+            # Costruzione deeplink affiliato per la ricerca specifica su Aviasales
+            formatted_depart = depart_date.replace("-", "")[2:] if depart_date else ""
+            formatted_return = return_date.replace("-", "")[2:] if return_date else ""
+            
+            search_url = f"https://www.aviasales.com/search/{origin}{formatted_depart}{destination}{formatted_return}1"
+            deep_link = f"https://tp.media/r?marker={marker}&p=4114&u={requests.utils.quote(search_url)}"
 
-            flight_info = {
-                "city_from": item.get("cityFrom"),
-                "airport_from": item.get("flyFrom"),
-                "city_to": item.get("cityTo"),
-                "country_to": item.get("countryTo", {}).get("name"),
-                "airport_to": item.get("flyTo"),
-                "price": item.get("price"),
-                "deep_link": affiliate_link,
-                "airline": item["route"][0].get("airline") if item.get("route") else "N/A",
+            return {
+                "city_from": origin,
+                "airport_from": origin,
+                "city_to": destination,
+                "airport_to": destination,
+                "price": deal.get("price"),
+                "airline": deal.get("airline", "Multi-compagnia"),
+                "deep_link": deep_link
             }
-            flights.append(flight_info)
+        else:
+            print(f"ℹ️ Nessun volo trovato tramite API per la tratta {origin} -> {destination}")
+    except Exception as e:
+        print(f"❌ Errore durante la chiamata a Travelpayouts API: {e}")
 
-        return flights
-
-    except requests.exceptions.RequestException as e:
-        print(f"❌ [flight_fetcher] Errore chiamata API: {e}")
-        return []
+    return None
