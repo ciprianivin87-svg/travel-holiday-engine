@@ -1,48 +1,59 @@
 import os
-from google import genai
+import time
+import google.generativeai as genai
 
 def generate_destination_summary(city_name, country_name, holiday_name, total_days):
     """
-    Genera un'introduzione e consigli di viaggio per una destinazione
-    in occasione di uno specifico ponte festivo.
+    Genera la guida di viaggio tramite Gemini con gestione del retry in caso di 503.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        print("⚠️  [ai_enricher] GEMINI_API_KEY non trovata nelle variabili d'ambiente.")
-        return f"Scopri {city_name} durante il ponte di {holiday_name}!"
+        print("⚠️ GEMINI_API_KEY non trovata. Utilizzo guida di fallback.")
+        return build_fallback_guide(city_name, holiday_name, total_days)
 
-    client = genai.Client(api_key=api_key)
+    genai.configure(api_key=api_key)
+    
+    # Utilizziamo il modello stabile gemini-3.8-flash
+    model = genai.GenerativeModel("gemini-3.8-flash")
 
     prompt = f"""
-    Sei un copywriter esperto di viaggi per una newsletter di offerte low-cost.
-    Scrivi una descrizione breve, ingaggiante ed entusiasta (massimo 120 parole) per invitare a visitare {city_name} ({country_name}) durante il ponte di {holiday_name} per una durata di {total_days} giorni.
-
-    Includi:
-    - Un titolo accattivante con emoji.
-    - 2-3 cose imperdibili da vedere/fare in {total_days} giorni.
-    - Un consiglio per il cibo tipico da assaggiare.
+    Crea una guida di viaggio breve, accattivante ed entusiasmante per una newsletter di viaggi.
     
-    Usa un tono fresco e accattivante, perfetto per una newsletter.
+    Destinazione: {city_name}, {country_name}
+    Occasione: {holiday_name}
+    Durata soggiorno: {total_days} giorni
+    
+    Includi:
+    - Un'introduzione d'impatto sul perché visitare {city_name} durante {holiday_name}.
+    - 3 attrazioni o attività imperdibili da fare in {total_days} giorni.
+    - Un consiglio culinario tipico della zona.
+    
+    Usa formattazione HTML pulita (paragrafi <p>, elenchi <ul> e <li>, grassetti <strong>). Non includere i tag <html> o <body>.
     """
 
-    try:
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",  # Oppure "gemini-1.5-flash" / "gemini-2.0-flash"
-            contents=prompt,
-        )
-        return response.text
-    except Exception as e:
-        print(f"❌ [ai_enricher] Errore durante la generazione Gemini: {e}")
-        return f"Un'ottima opportunità per visitare {city_name} durante il ponte di {holiday_name}!"
+    # Tentativi automatici con pausa (backoff)
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = model.generate_content(prompt)
+            if response and response.text:
+                return response.text
+        except Exception as e:
+            print(f"⚠️ Tentativo {attempt}/{max_retries} fallito per Gemini ({e})...")
+            if attempt < max_retries:
+                time.sleep(3) # Attendi 3 secondi prima di riprovare
 
-if __name__ == "__main__":
-    # Test del modulo
-    print("--- TEST GEMINI AI ENRICHER ---")
-    summary = generate_destination_summary(
-        city_name="Praga",
-        country_name="Repubblica Ceca",
-        holiday_name="Immacolata Concezione",
-        total_days=4
-    )
-    print("\nRisultato generato da Gemini:\n")
-    print(summary)
+    print("❌ Tutti i tentativi con Gemini sono falliti. Utilizzo guida di fallback.")
+    return build_fallback_guide(city_name, holiday_name, total_days)
+
+
+def build_fallback_guide(city_name, holiday_name, total_days):
+    return f"""
+    <p>Preparati a vivere un'esperienza fantastica a <strong>{city_name}</strong> durante il ponte di <strong>{holiday_name}</strong>!</p>
+    <p>Con <strong>{total_days} giorni</strong> a disposizione avrai il tempo ideale per esplorare i luoghi più iconici del centro storico, scoprire la cultura locale e assaggiare le specialità culinarie tipiche.</p>
+    <ul>
+        <li><strong>Giro del Centro Storico:</strong> Passeggia tra le attrazioni principali ed i monumenti simbolo.</li>
+        <li><strong>Enogastronomia Locale:</strong> Scopri i piatti tradizionali nei ristoranti caratteristici.</li>
+        <li><strong>Relax e Atmosfera:</strong> Goditi lo spirito festivo della città durante questo ponte.</li>
+    </ul>
+    """
