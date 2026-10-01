@@ -26,6 +26,9 @@ def build_html_newsletter(deal_payload):
     bridge = deal_payload["bridge_info"]
     flight = deal_payload["flight"]
     guide = deal_payload["guide_text"]
+    
+    # Pre-formattazione del testo per evitare backslash dentro la f-string
+    formatted_guide = guide.replace('\n', '<br>')
 
     html = f"""<!DOCTYPE html>
 <html>
@@ -58,7 +61,7 @@ def build_html_newsletter(deal_payload):
 
     <div class="card">
         <h3>🗺️ Cosa Fare e Vedere</h3>
-        <div>{guide.replace('\n', '<br>')}</div>
+        <div>{formatted_guide}</div>
     </div>
 </body>
 </html>"""
