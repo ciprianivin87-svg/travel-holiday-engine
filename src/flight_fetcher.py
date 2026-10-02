@@ -1,8 +1,8 @@
 import os
 import random
 import requests
+from datetime import datetime
 
-# Lista di destinazioni europee da monitorare
 DESTINATIONS = [
     {"code": "BUD", "city": "Budapest"},
     {"code": "PRG", "city": "Praga"},
@@ -15,15 +15,27 @@ DESTINATIONS = [
     {"code": "MAD", "city": "Madrid"}
 ]
 
+def format_aviasales_url(origin, dest, departure_date, return_date, marker):
+    """
+    Formatta correttamente l'URL di ricerca Aviasales convertendo YYYY-MM-DD in DDMM
+    Es. 2026-12-05 -> 0512
+    """
+    try:
+        dep_dt = datetime.strptime(str(departure_date), "%Y-%m-%d")
+        ret_dt = datetime.strptime(str(return_date), "%Y-%m-%d")
+        dep_str = dep_dt.strftime("%d%m")  # GGMM
+        ret_str = ret_dt.strftime("%d%m")  # GGMM
+        return f"https://www.aviasales.com/search/{origin}{dep_str}{dest}{ret_str}1?marker={marker}"
+    except Exception:
+        # Fallback in caso la data sia già formattata diversamente
+        dep_clean = str(departure_date).replace('-', '')
+        ret_clean = str(return_date).replace('-', '')
+        return f"https://www.aviasales.com/search/{origin}{dep_clean}{dest}{ret_clean}1?marker={marker}"
+
 def get_cheapest_flight(origin="BRI", departure_date=None, return_date=None, destination=None, depart_date=None, **kwargs):
-    """
-    Cerca i voli per le destinazioni desiderate supportando sia 'depart_date' che 'departure_date'.
-    """
-    # Gestione della compatibilità dei nomi dei parametri
     dep_date = depart_date or departure_date
     ret_date = return_date
     
-    # Se viene passata una destinazione specifica, usiamo solo quella, altrimenti cerchiamo su tutte
     search_list = DESTINATIONS
     if destination:
         search_list = [{"code": destination, "city": destination}]
@@ -40,13 +52,12 @@ def get_cheapest_flight(origin="BRI", departure_date=None, return_date=None, des
             "city_to": selected["city"],
             "airport_to": selected["code"],
             "price": 49,
-            "airline": "FR",
-            "deep_link": f"https://www.aviasales.com/search/{origin}{str(dep_date).replace('-', '')}{selected['code']}{str(ret_date).replace('-', '')}1?marker={marker}"
+            "airline": "Ryanair / Wizz Air",
+            "deep_link": format_aviasales_url(origin, selected["code"], dep_date, ret_date, marker)
         }
 
     deals = []
     
-    # Esegue la ricerca per ogni destinazione nell'elenco
     for dest in search_list:
         url = "https://api.travelpayouts.com/v2/prices/week-matrix"
         params = {
@@ -72,7 +83,7 @@ def get_cheapest_flight(origin="BRI", departure_date=None, return_date=None, des
                             "airport_to": dest["code"],
                             "price": int(item.get("value", 999)),
                             "airline": item.get("gate", "Volo Diretto"),
-                            "deep_link": f"https://www.aviasales.com/search/{origin}{str(dep_date).replace('-', '')}{dest['code']}{str(ret_date).replace('-', '')}1?marker={marker}"
+                            "deep_link": format_aviasales_url(origin, dest["code"], dep_date, ret_date, marker)
                         })
         except Exception as e:
             print(f"⚠️ Errore ricerca volo per {dest['code']}: {e}")
@@ -87,13 +98,10 @@ def get_cheapest_flight(origin="BRI", departure_date=None, return_date=None, des
             "airport_to": selected["code"],
             "price": 55,
             "airline": "Wizz Air / Ryanair",
-            "deep_link": f"https://www.aviasales.com/search/{origin}{str(dep_date).replace('-', '')}{selected['code']}{str(ret_date).replace('-', '')}1?marker={marker}"
+            "deep_link": format_aviasales_url(origin, selected["code"], dep_date, ret_date, marker)
         }
 
-    # Ordina i risultati dal più economico al più caro
     deals.sort(key=lambda x: x["price"])
-    
-    # Prende le prime 3 offerte più economiche e ne sceglie una a caso per variare ad ogni run
     top_deals = deals[:3]
     chosen_deal = random.choice(top_deals)
     
