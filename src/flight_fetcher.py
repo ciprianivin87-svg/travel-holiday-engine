@@ -1,6 +1,7 @@
 import os
 import random
 import requests
+import urllib.parse
 from datetime import datetime
 
 # Lista delle destinazioni europee monitorate da Bari (BRI)
@@ -18,21 +19,30 @@ DESTINATIONS = [
 
 def format_aviasales_url(origin, dest, departure_date, return_date, marker):
     """
-    Formatta correttamente l'URL di ricerca Aviasales convertendo YYYY-MM-DD in DDMM
-    ed impostando la valuta in Euro (EUR) e lingua italiana (locale=it).
-    Es. 2026-12-05 -> 0512
+    Formatta l'URL impostando in automatico:
+    - Dominio italiano (aviasales.it)
+    - Mercato Italia (&market=it)
+    - Lingua Italiana (&locale=it)
+    - Valuta Euro (&currency=EUR)
+    - Tracciamento affiliazione Travelpayouts (&marker=...)
     """
     try:
         dep_dt = datetime.strptime(str(departure_date), "%Y-%m-%d")
         ret_dt = datetime.strptime(str(return_date), "%Y-%m-%d")
-        dep_str = dep_dt.strftime("%d%m")  # Formato GGMM (es. 0512)
-        ret_str = ret_dt.strftime("%d%m")  # Formato GGMM (es. 0812)
-        return f"https://www.aviasales.com/search/{origin}{dep_str}{dest}{ret_str}1?marker={marker}&currency=EUR&locale=it"
+        dep_str = dep_dt.strftime("%d%m")  # Formato GGMM (es. 0512 per 5 Dicembre)
+        ret_str = ret_dt.strftime("%d%m")  # Formato GGMM (es. 0812 per 8 Dicembre)
+        search_path = f"{origin}{dep_str}{dest}{ret_str}1"
     except Exception:
-        # Fallback in caso la data sia già formattata in altro modo
         dep_clean = str(departure_date).replace('-', '')
         ret_clean = str(return_date).replace('-', '')
-        return f"https://www.aviasales.com/search/{origin}{dep_clean}{dest}{ret_clean}1?marker={marker}&currency=EUR&locale=it"
+        search_path = f"{origin}{dep_clean}{dest}{ret_clean}1"
+
+    # URL diretto su aviasales.it con paese, lingua e valuta forzati
+    target_url = (
+        f"https://www.aviasales.it/search/{search_path}"
+        f"?marker={marker}&currency=EUR&locale=it&market=it"
+    )
+    return target_url
 
 def get_cheapest_flight(origin="BRI", departure_date=None, return_date=None, destination=None, depart_date=None, **kwargs):
     """
