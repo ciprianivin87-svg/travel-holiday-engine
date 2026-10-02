@@ -15,7 +15,7 @@ DESTINATIONS = [
     {"code": "MAD", "city": "Madrid"}
 ]
 
-def search_best_flight_deal(origin, departure_date, return_date):
+def get_cheapest_flight(origin, departure_date, return_date):
     """
     Cerca i voli per tutte le destinazioni in lista per le date indicate,
     trova le migliori offerte e ne seleziona una conveniente a rotazione.
@@ -33,7 +33,7 @@ def search_best_flight_deal(origin, departure_date, return_date):
             "airport_to": selected["code"],
             "price": 49,
             "airline": "FR",
-            "deep_link": f"https://aviasales.com/search/{origin}{departure_date}{selected['code']}{return_date}1?marker={marker}"
+            "deep_link": f"https://www.aviasales.com/search/{origin}{departure_date.replace('-', '')}{selected['code']}{return_date.replace('-', '')}1?marker={marker}"
         }
 
     deals = []
@@ -56,7 +56,6 @@ def search_best_flight_deal(origin, departure_date, return_date):
             if res.status_code == 200:
                 data = res.json().get("data", [])
                 for item in data:
-                    # Filtra per le date esatte del ponte
                     if item.get("depart_date") == departure_date and item.get("return_date") == return_date:
                         deals.append({
                             "city_from": "Bari",
