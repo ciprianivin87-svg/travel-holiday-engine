@@ -15,18 +15,21 @@ DESTINATIONS = [
     {"code": "MAD", "city": "Madrid"}
 ]
 
-def get_cheapest_flight(origin, departure_date, return_date, destination=None):
+def get_cheapest_flight(origin="BRI", departure_date=None, return_date=None, destination=None, depart_date=None, **kwargs):
     """
-    Cerca i voli per tutte le destinazioni in lista (o per quella specificata),
-    trova le migliori offerte e ne seleziona una conveniente a rotazione.
+    Cerca i voli per le destinazioni desiderate supportando sia 'depart_date' che 'departure_date'.
     """
-    token = os.getenv("TRAVELPAYOUTS_API_TOKEN")
-    marker = os.getenv("TRAVELPAYOUTS_MARKER", "784148")
+    # Gestione della compatibilità dei nomi dei parametri
+    dep_date = depart_date or departure_date
+    ret_date = return_date
     
-    # Se viene passata una destinazione specifica, la usiamo come lista con 1 elemento
+    # Se viene passata una destinazione specifica, usiamo solo quella, altrimenti cerchiamo su tutte
     search_list = DESTINATIONS
     if destination:
         search_list = [{"code": destination, "city": destination}]
+
+    token = os.getenv("TRAVELPAYOUTS_API_TOKEN")
+    marker = os.getenv("TRAVELPAYOUTS_MARKER", "784148")
 
     if not token:
         print("⚠️ TRAVELPAYOUTS_API_TOKEN non impostato. Uso dati simulati di fallback.")
@@ -38,7 +41,7 @@ def get_cheapest_flight(origin, departure_date, return_date, destination=None):
             "airport_to": selected["code"],
             "price": 49,
             "airline": "FR",
-            "deep_link": f"https://www.aviasales.com/search/{origin}{departure_date.replace('-', '')}{selected['code']}{return_date.replace('-', '')}1?marker={marker}"
+            "deep_link": f"https://www.aviasales.com/search/{origin}{str(dep_date).replace('-', '')}{selected['code']}{str(ret_date).replace('-', '')}1?marker={marker}"
         }
 
     deals = []
@@ -51,8 +54,8 @@ def get_cheapest_flight(origin, departure_date, return_date, destination=None):
             "origin": origin,
             "destination": dest["code"],
             "show_to_affiliates": "true",
-            "depart_date": departure_date,
-            "return_date": return_date,
+            "depart_date": dep_date,
+            "return_date": ret_date,
             "token": token
         }
         
@@ -61,7 +64,7 @@ def get_cheapest_flight(origin, departure_date, return_date, destination=None):
             if res.status_code == 200:
                 data = res.json().get("data", [])
                 for item in data:
-                    if item.get("depart_date") == departure_date and item.get("return_date") == return_date:
+                    if item.get("depart_date") == dep_date and item.get("return_date") == ret_date:
                         deals.append({
                             "city_from": "Bari",
                             "airport_from": origin,
@@ -69,13 +72,13 @@ def get_cheapest_flight(origin, departure_date, return_date, destination=None):
                             "airport_to": dest["code"],
                             "price": int(item.get("value", 999)),
                             "airline": item.get("gate", "Volo Diretto"),
-                            "deep_link": f"https://www.aviasales.com/search/{origin}{departure_date.replace('-', '')}{dest['code']}{return_date.replace('-', '')}1?marker={marker}"
+                            "deep_link": f"https://www.aviasales.com/search/{origin}{str(dep_date).replace('-', '')}{dest['code']}{str(ret_date).replace('-', '')}1?marker={marker}"
                         })
         except Exception as e:
             print(f"⚠️ Errore ricerca volo per {dest['code']}: {e}")
 
     if not deals:
-        print("⚠️️ Nessun volo trovato tramite API per le date selezionate. Generazione offerta di fallback.")
+        print("⚠️ Nessun volo trovato tramite API per le date selezionate. Generazione offerta di fallback.")
         selected = random.choice(search_list)
         return {
             "city_from": "Bari",
@@ -84,7 +87,7 @@ def get_cheapest_flight(origin, departure_date, return_date, destination=None):
             "airport_to": selected["code"],
             "price": 55,
             "airline": "Wizz Air / Ryanair",
-            "deep_link": f"https://www.aviasales.com/search/{origin}{departure_date.replace('-', '')}{selected['code']}{return_date.replace('-', '')}1?marker={marker}"
+            "deep_link": f"https://www.aviasales.com/search/{origin}{str(dep_date).replace('-', '')}{selected['code']}{str(ret_date).replace('-', '')}1?marker={marker}"
         }
 
     # Ordina i risultati dal più economico al più caro
