@@ -15,17 +15,22 @@ DESTINATIONS = [
     {"code": "MAD", "city": "Madrid"}
 ]
 
-def get_cheapest_flight(origin, departure_date, return_date):
+def get_cheapest_flight(origin, departure_date, return_date, destination=None):
     """
-    Cerca i voli per tutte le destinazioni in lista per le date indicate,
+    Cerca i voli per tutte le destinazioni in lista (o per quella specificata),
     trova le migliori offerte e ne seleziona una conveniente a rotazione.
     """
     token = os.getenv("TRAVELPAYOUTS_API_TOKEN")
     marker = os.getenv("TRAVELPAYOUTS_MARKER", "784148")
     
+    # Se viene passata una destinazione specifica, la usiamo come lista con 1 elemento
+    search_list = DESTINATIONS
+    if destination:
+        search_list = [{"code": destination, "city": destination}]
+
     if not token:
         print("⚠️ TRAVELPAYOUTS_API_TOKEN non impostato. Uso dati simulati di fallback.")
-        selected = random.choice(DESTINATIONS)
+        selected = random.choice(search_list)
         return {
             "city_from": "Bari",
             "airport_from": origin,
@@ -39,7 +44,7 @@ def get_cheapest_flight(origin, departure_date, return_date):
     deals = []
     
     # Esegue la ricerca per ogni destinazione nell'elenco
-    for dest in DESTINATIONS:
+    for dest in search_list:
         url = "https://api.travelpayouts.com/v2/prices/week-matrix"
         params = {
             "currency": "EUR",
@@ -70,8 +75,8 @@ def get_cheapest_flight(origin, departure_date, return_date):
             print(f"⚠️ Errore ricerca volo per {dest['code']}: {e}")
 
     if not deals:
-        print("⚠️ Nessun volo trovato tramite API per le date selezionate. Generazione offerta di fallback.")
-        selected = random.choice(DESTINATIONS)
+        print("⚠️️ Nessun volo trovato tramite API per le date selezionate. Generazione offerta di fallback.")
+        selected = random.choice(search_list)
         return {
             "city_from": "Bari",
             "airport_from": origin,
