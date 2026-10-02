@@ -3,6 +3,7 @@ import random
 import requests
 from datetime import datetime
 
+# Lista delle destinazioni europee monitorate da Bari (BRI)
 DESTINATIONS = [
     {"code": "BUD", "city": "Budapest"},
     {"code": "PRG", "city": "Praga"},
@@ -18,21 +19,26 @@ DESTINATIONS = [
 def format_aviasales_url(origin, dest, departure_date, return_date, marker):
     """
     Formatta correttamente l'URL di ricerca Aviasales convertendo YYYY-MM-DD in DDMM
+    ed impostando la valuta in Euro (EUR) e lingua italiana (locale=it).
     Es. 2026-12-05 -> 0512
     """
     try:
         dep_dt = datetime.strptime(str(departure_date), "%Y-%m-%d")
         ret_dt = datetime.strptime(str(return_date), "%Y-%m-%d")
-        dep_str = dep_dt.strftime("%d%m")  # GGMM
-        ret_str = ret_dt.strftime("%d%m")  # GGMM
-        return f"https://www.aviasales.com/search/{origin}{dep_str}{dest}{ret_str}1?marker={marker}"
+        dep_str = dep_dt.strftime("%d%m")  # Formato GGMM (es. 0512)
+        ret_str = ret_dt.strftime("%d%m")  # Formato GGMM (es. 0812)
+        return f"https://www.aviasales.com/search/{origin}{dep_str}{dest}{ret_str}1?marker={marker}&currency=EUR&locale=it"
     except Exception:
-        # Fallback in caso la data sia già formattata diversamente
+        # Fallback in caso la data sia già formattata in altro modo
         dep_clean = str(departure_date).replace('-', '')
         ret_clean = str(return_date).replace('-', '')
-        return f"https://www.aviasales.com/search/{origin}{dep_clean}{dest}{ret_clean}1?marker={marker}"
+        return f"https://www.aviasales.com/search/{origin}{dep_clean}{dest}{ret_clean}1?marker={marker}&currency=EUR&locale=it"
 
 def get_cheapest_flight(origin="BRI", departure_date=None, return_date=None, destination=None, depart_date=None, **kwargs):
+    """
+    Cerca il volo più conveniente su Travelpayouts per le date specificate.
+    Accetta sia departure_date sia depart_date per retrocompatibilità.
+    """
     dep_date = depart_date or departure_date
     ret_date = return_date
     
@@ -43,6 +49,7 @@ def get_cheapest_flight(origin="BRI", departure_date=None, return_date=None, des
     token = os.getenv("TRAVELPAYOUTS_API_TOKEN")
     marker = os.getenv("TRAVELPAYOUTS_MARKER", "784148")
 
+    # Se non c'è il token API, restituisce un volo generato di fallback
     if not token:
         print("⚠️ TRAVELPAYOUTS_API_TOKEN non impostato. Uso dati simulati di fallback.")
         selected = random.choice(search_list)
@@ -88,6 +95,7 @@ def get_cheapest_flight(origin="BRI", departure_date=None, return_date=None, des
         except Exception as e:
             print(f"⚠️ Errore ricerca volo per {dest['code']}: {e}")
 
+    # Fallback nel caso in cui l'API non restituisca risultati per le date indicate
     if not deals:
         print("⚠️ Nessun volo trovato tramite API per le date selezionate. Generazione offerta di fallback.")
         selected = random.choice(search_list)
@@ -101,6 +109,7 @@ def get_cheapest_flight(origin="BRI", departure_date=None, return_date=None, des
             "deep_link": format_aviasales_url(origin, selected["code"], dep_date, ret_date, marker)
         }
 
+    # Ordina le offerte per prezzo e ne sceglie una tra le prime tre più economiche
     deals.sort(key=lambda x: x["price"])
     top_deals = deals[:3]
     chosen_deal = random.choice(top_deals)
